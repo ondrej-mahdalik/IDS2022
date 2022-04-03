@@ -26,7 +26,8 @@ CREATE TABLE Zamestnanec
     CONSTRAINT FK_oddeleni_manazera
         FOREIGN KEY (kod_oddeleni_zamestnance) REFERENCES Oddeleni (kod_oddeleni),
     CONSTRAINT CHK_format_rc
-        CHECK ( REGEXP_LIKE(rodne_c, '^[0-9]{9}[0-9]?$') AND MOD(rodne_c, 11) = 0),
+        CHECK ( (REGEXP_LIKE(rodne_c, '^[0-9]{10}$') AND MOD(rodne_c, 11) = 0) OR
+                 REGEXP_LIKE(rodne_c, '^[0-9]{6}[1-9]{3}$')),
     CONSTRAINT CHK_role_zamestnance
         CHECK ( (role = 'RED' AND id_nadrizeny_reditel IS NULL AND kod_oddeleni_zamestnance IS NULL) OR
                 (role = 'MAN' AND id_nadrizeny_reditel IS NULL AND kod_oddeleni_zamestnance IS NOT NULL) OR
