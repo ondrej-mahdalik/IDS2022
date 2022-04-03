@@ -18,6 +18,9 @@ CREATE TABLE Zamestnanec
     role                     CHAR(3)     NOT NULL,
     id_nadrizeny_reditel     INT,
     kod_oddeleni_zamestnance VARCHAR(10),
+
+    CONSTRAINT PK_zamestnanec
+        PRIMARY KEY (c_zamestnance),
     CONSTRAINT FK_nadrizeny_reditel
         FOREIGN KEY (id_nadrizeny_reditel) REFERENCES Zamestnanec (c_zamestnance),
     CONSTRAINT FK_oddeleni_manazera
@@ -44,7 +47,7 @@ CREATE TABLE Udalost
         PRIMARY KEY (id_udalosti),
     CONSTRAINT FK_autor
         FOREIGN KEY (id_autor) REFERENCES Zamestnanec (c_zamestnance),
-    CONSTRAINT CHK_data
+    CONSTRAINT CHK_date
         CHECK (datum_cas_od < datum_cas_do)
 );
 
@@ -52,7 +55,7 @@ CREATE TABLE Ucast_udalosti
 (
     c_zamestnance INT NOT NULL,
     id_udalosti   INT NOT NULL,
-    CONSTRAINT PK_udalost_zamestance
+    CONSTRAINT PK_ucast_udalosti
         PRIMARY KEY (c_zamestnance, id_udalosti),
     CONSTRAINT FK_zamestnanec
         FOREIGN KEY (c_zamestnance) REFERENCES Zamestnanec (c_zamestnance),
@@ -102,15 +105,12 @@ VALUES (TO_DATE('3.4.2022 12:00', 'DD.MM.YYYY HH24:MI'), TO_DATE('3.4.2022 16:00
         'Porada ohledně marketingu', 'Konferenční sál', 4);
 
 INSERT INTO Udalost (datum_cas_od, datum_cas_do, nazev, misto_konani, id_autor)
-VALUES (TO_DATE('12.4.2022 9:00', 'DD.MM.YYYY HH24:MI'), TO_DATE('3.4.2022 9:30', 'DD.MM.YYYY HH24:MI'),
-        'Schůze manažerů', 'Konferenční sál', 1);
+VALUES (TO_DATE('12.4.2022 9:00', 'DD.MM.YYYY HH24:MI'), TO_DATE('28.4.2022 9:30', 'DD.MM.YYYY HH24:MI'),
+        'Schůze vedení', 'Konferenční sál', 1);
 
 -- Ucastnici udalosti
 INSERT INTO Ucast_udalosti (c_zamestnance, id_udalosti)
-VALUES (1, 1);
-
-INSERT INTO Ucast_udalosti (c_zamestnance, id_udalosti)
-VALUES (2, 1);
+VALUES (3, 1);
 
 INSERT INTO Ucast_udalosti (c_zamestnance, id_udalosti)
 VALUES (2, 2);
@@ -119,7 +119,7 @@ INSERT INTO Ucast_udalosti (c_zamestnance, id_udalosti)
 VALUES (1, 3);
 
 INSERT INTO Ucast_udalosti (c_zamestnance, id_udalosti)
-VALUES (3, 3);
+VALUES (2, 3);
 
 INSERT INTO Ucast_udalosti (c_zamestnance, id_udalosti)
 VALUES (1, 4);
