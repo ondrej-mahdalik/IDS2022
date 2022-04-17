@@ -73,6 +73,9 @@ VALUES ('HR', 'Oddělení lidských zdrojů');
 
 INSERT INTO Oddeleni (kod_oddeleni, nazev_oddeleni)
 VALUES ('MRK', 'Marketingové oddělení');
+
+INSERT INTO Oddeleni (kod_oddeleni, nazev_oddeleni)
+VALUES ('NZO', 'Nově zakládané oddělení');
 -- Entity s auto-increment PK
 -- Uzivatele
 INSERT INTO Zamestnanec (rodne_c, jmeno, prijmeni, role)
@@ -157,16 +160,25 @@ WHERE Z.jmeno = 'Petr' and Z.prijmeni = 'Kubala';
 -- dotaz s klauzulí GROUP BY a agregační funkcí č.1
 -- Kolik zaměstanců májí jednotlivá oddělení?
 SELECT O.nazev_oddeleni, COUNT(Z.c_zamestnance) AS pocet_zamestanancu
-FROM Zamestnanec Z JOIN Oddeleni O ON Z.kod_oddeleni_zamestnance = O.kod_oddeleni
+FROM Oddeleni O LEFT JOIN Zamestnanec Z ON Z.kod_oddeleni_zamestnance = O.kod_oddeleni
 GROUP BY O.kod_oddeleni, O.nazev_oddeleni;
 
 -- dotaz s klauzulí GROUP BY a agregační funkcí č.2
 -- Kolika událostí se v dubnu 2022 účastní jednotliví členové vedení?
-SELECT Z.jmeno, Z.prijmeni, Z.rodne_c, Z.role, COUNT(U.id_udalosti) AS pocet_udalosti
-FROM Zamestnanec Z JOIN Ucast_udalosti UU ON Z.c_zamestnance = UU.c_zamestnance
-    JOIN UDALOST U ON UU.id_udalosti = U.id_udalosti
-WHERE U.datum_cas_do BETWEEN TO_DATE('1.4.2022 00:00', 'DD.MM.YYYY HH24:MI') AND TO_DATE('30.4.2022 23:59', 'DD.MM.YYYY HH24:MI')
-GROUP BY Z.c_zamestnance, Z.jmeno, Z.prijmeni, Z.role, Z.rodne_c;
+WITH Pocty_udalosti AS
+    (
+        SELECT Z.c_zamestnance, COUNT(U.ID_AUTOR) pocet_udalosti
+        FROM Zamestnanec Z JOIN Ucast_udalosti UU ON Z.c_zamestnance = UU.c_zamestnance
+           JOIN UDALOST U ON UU.id_udalosti = U.id_udalosti
+        WHERE U.datum_cas_do BETWEEN TO_DATE('1.4.2022 00:00', 'DD.MM.YYYY HH24:MI') AND TO_DATE('30.4.2022 23:59', 'DD.MM.YYYY HH24:MI')
+        GROUP BY Z.c_zamestnance
+    )
+SELECT Z.jmeno, Z.prijmeni, Z.role, O.nazev_oddeleni,  COALESCE(PU.pocet_udalosti, 0) pocet_udalosti
+FROM Zamestnanec Z LEFT JOIN Pocty_udalosti PU ON Z.c_zamestnance = PU.c_zamestnance LEFT JOIN Oddeleni O ON Z.kod_oddeleni_zamestnance = O.kod_oddeleni
+WHERE Z.role in ('MAN', 'RED') ;
+
+
+
 
 -- dotaz obsahující predikát EXISTS
 -- Které sekretářky nevytvořili žádnou událost?
