@@ -267,7 +267,7 @@ END;
 
 
 -- EXPLAIN PLAIN + index (optimalizace)
--- TODO
+--TODO
 
 -- definice přístupových práv
 GRANT ALL ON Oddeleni       TO XMAHDA14;
@@ -278,8 +278,28 @@ GRANT ALL ON Udalost        TO XMAHDA14;
 GRANT EXECUTE ON pocet_udalosti_na_zamestnance  TO XMAHDA14;
 GRANT EXECUTE ON detaily_udalosti               TO XMAHDA14;
 
--- materializovaný pohled
--- TODO
+-- materializovaný pohled zobrazující události manažera finančního oddělení
+DROP MATERIALIZED VIEW Udalosti_manazera_FIN;
+CREATE MATERIALIZED VIEW Udalosti_manazera_FIN AS
+    SELECT * FROM Udalost U
+    WHERE U.id_autor IN ( SELECT Z.c_zamestnance
+                          FROM Zamestnanec Z
+                          WHERE Z.kod_oddeleni_zamestnance = 'FIN');
+-- Test Udalosti_manazera_FIN
+SELECT * FROM Udalosti_manazera_FIN;
+-- TODO další operace
+
+-- pohled zobrazující nepřítomnost ředitele firmy (READ ONLY)
+DROP VIEW Reditelova_nepritomnost;
+CREATE OR REPLACE VIEW Reditelova_nepritomnost AS
+    SELECT U.datum_cas_od, U.datum_cas_do
+    FROM Udalost U
+    WHERE U.id_autor IN ( SELECT Z.c_zamestnance
+                          FROM Zamestnanec Z
+                          WHERE Z.role = 'RED' OR Z.id_nadrizeny_reditel = 1)
+    WITH READ ONLY;
+-- Test Reditelova_nepritomnost
+SELECT * FROM Reditelova_nepritomnost;
 
 -- trigger č.2
 -- on delete cascade - při smazíní uživatele se smažou i jeho účasti na událostech
