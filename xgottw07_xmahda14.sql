@@ -267,7 +267,7 @@ END;
 
 
 -- EXPLAIN PLAIN + index (optimalizace)
---TODO
+-- TODO
 
 -- definice přístupových práv
 GRANT ALL ON Oddeleni       TO XMAHDA14;
