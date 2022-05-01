@@ -304,9 +304,24 @@ CREATE MATERIALIZED VIEW Udalosti_manazera_FIN AS
                           WHERE Z.kod_oddeleni_zamestnance = 'FIN');
 -- Test Udalosti_manazera_FIN
 SELECT * FROM Udalosti_manazera_FIN;
--- TODO další operace
 
--- pohled zobrazující nepřítomnost ředitele firmy (READ ONLY)
+-- Přidání nové položky do Udalost
+INSERT INTO Udalost (datum_cas_od, datum_cas_do, nazev, misto_konani, id_autor)
+    VALUES (TO_DATE('29.4.2022 15:00', 'DD.MM.YYYY HH24:MI'), TO_DATE('29.4.2022 22:00', 'DD.MM.YYYY HH24:MI'),
+        'Teambuilding', 'Externi prostory', 4);
+
+-- Upráva položky v Udalost
+UPDATE Udalost SET datum_cas_od = TO_DATE('29.4.2022 15:00', 'DD.MM.YYYY HH24:MI'), datum_cas_do = TO_DATE('29.4.2022 22:00', 'DD.MM.YYYY HH24:MI') WHERE id_udalosti = 3;
+
+-- Opětovný výpis položek (provedené změny se v material view neprojevi)
+SELECT * FROM Udalosti_manazera_FIN;
+-- vs
+SELECT * FROM Udalost U
+    WHERE U.id_autor IN ( SELECT Z.c_zamestnance
+                          FROM Zamestnanec Z
+                          WHERE Z.kod_oddeleni_zamestnance = 'FIN');
+
+-- Pohled zobrazující nepřítomnost ředitele firmy (READ ONLY)
 DROP VIEW Reditelova_nepritomnost;
 CREATE OR REPLACE VIEW Reditelova_nepritomnost AS
     SELECT U.datum_cas_od, U.datum_cas_do
