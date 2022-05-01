@@ -1,3 +1,7 @@
+-- IDS Projekt 2021/2022
+-- Autoři: Vilém Gottwald (xgottw07), Ondřej Mahdalík (xmahda14)
+-- Datum: 1. 5. 2022
+
 -- SET serveroutput ON; -- odkomentovat v případě používání SQL Developeru
 
 DROP TABLE Ucast_udalosti CASCADE CONSTRAINTS PURGE;
