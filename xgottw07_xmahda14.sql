@@ -1,7 +1,11 @@
+-- SET serveroutput ON; -- odkomentovat v případě používání SQL Developeru
+
 DROP TABLE Ucast_udalosti CASCADE CONSTRAINTS PURGE;
 DROP TABLE Udalost CASCADE CONSTRAINTS PURGE;
 DROP TABLE Zamestnanec CASCADE CONSTRAINTS PURGE;
 DROP TABLE Oddeleni CASCADE CONSTRAINTS PURGE;
+DROP MATERIALIZED VIEW Udalosti_manazera_FIN;
+DROP MATERIALIZED VIEW Aktivita_duben;
 
 ---------------------- Vytvoření tabulek ------------------------------
 CREATE TABLE Oddeleni
@@ -155,7 +159,6 @@ INSERT INTO Ucast_udalosti (c_zamestnance, id_udalosti)
 VALUES (3, 4);
 
 ----------- Vytvoření pokročilých objektů schématu databáze ---------------------------
--- SET serveroutput ON; -- odkomentovat v případě používání SQL Developeru
 
 ---- Triggery: - 1. umístěn za příkazem vytvoření tabulky uživatele
 --          - 2. a 3. umístěny na konci souboru (pro jejich demonstraci jsou použity neidempotentní operace)
@@ -269,29 +272,26 @@ BEGIN
     detaily_udalosti(6); -- vyvolání výjimky
 END;
 
-----  EXPLAIN PLAIN + index ----
+-- EXPLAIN PLAN + index (optimalizace)
 -- Kolika událostí se v dubnu 2022 účastní jednotliví členové vedení?
 EXPLAIN PLAN FOR
 SELECT O.nazev_oddeleni, COUNT(Z.c_zamestnance) AS pocet_zamestanancu
-FROM Oddeleni O
-         LEFT JOIN Zamestnanec Z ON Z.kod_oddeleni_zamestnance = O.kod_oddeleni
+FROM Oddeleni O LEFT JOIN Zamestnanec Z ON Z.kod_oddeleni_zamestnance = O.kod_oddeleni
 GROUP BY O.kod_oddeleni, O.nazev_oddeleni;
 
-SELECT *
-FROM TABLE (DBMS_XPLAN.DISPLAY);
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
 
--- Přidání indexu pro optimalizaci
+-- Pridani indexu pro optimalizaci
 CREATE INDEX oddeleni_k_n ON Oddeleni(kod_oddeleni, nazev_oddeleni);
 
--- Zopakování EXPLAIN PLAIN
+-- Zopakování EXPLAIN PLAN
 EXPLAIN PLAN FOR
 SELECT O.nazev_oddeleni, COUNT(Z.c_zamestnance) AS pocet_zamestanancu
-FROM Oddeleni O
-         LEFT JOIN Zamestnanec Z ON Z.kod_oddeleni_zamestnance = O.kod_oddeleni
+FROM Oddeleni O LEFT JOIN Zamestnanec Z ON Z.kod_oddeleni_zamestnance = O.kod_oddeleni
 GROUP BY O.kod_oddeleni, O.nazev_oddeleni;
 
-SELECT *
-FROM TABLE (DBMS_XPLAN.DISPLAY);
+
+SELECT * FROM TABLE (DBMS_XPLAN.DISPLAY);
 
 ---- Definice přístupových práv pro druhého člena týmu ----
 GRANT ALL ON Oddeleni TO XMAHDA14;
@@ -305,10 +305,8 @@ GRANT EXECUTE ON detaily_udalosti TO XMAHDA14;
 ---- Materializovaný pohled vytvořený druhým členem týmu ----
 --!! Následující část spouští XMAHDA14 !!--
 -- Zobrazuje události manažera finančního oddělení
-DROP MATERIALIZED VIEW Udalosti_manazera_FIN;
 CREATE MATERIALIZED VIEW Udalosti_manazera_FIN AS
-SELECT *
-FROM XGOTTW07.Udalost U
+SELECT * FROM XGOTTW07.Udalost U
 WHERE U.id_autor IN (SELECT Z.c_zamestnance
                      FROM XGOTTW07.Zamestnanec Z
                      WHERE Z.kod_oddeleni_zamestnance = 'FIN');
@@ -336,6 +334,29 @@ FROM XGOTTW07.Udalost U
 WHERE U.id_autor IN (SELECT Z.c_zamestnance
                      FROM XGOTTW07.Zamestnanec Z
                      WHERE Z.kod_oddeleni_zamestnance = 'FIN');
+
+-- Druhý materializovaný pohled
+-- Zobrazuje, kolika událostí se v dubnu 2022 účastní jednotliví členové vedení?
+CREATE MATERIALIZED VIEW Aktivita_duben AS
+WITH Pocty_udalosti AS
+    (
+        SELECT Z.c_zamestnance, COUNT(U.ID_AUTOR) pocet_udalosti
+        FROM Zamestnanec Z JOIN Ucast_udalosti UU ON Z.c_zamestnance = UU.c_zamestnance
+           JOIN UDALOST U ON UU.id_udalosti = U.id_udalosti
+        WHERE U.datum_cas_do BETWEEN TO_DATE('1.4.2022 00:00', 'DD.MM.YYYY HH24:MI') AND TO_DATE('30.4.2022 23:59', 'DD.MM.YYYY HH24:MI')
+        GROUP BY Z.c_zamestnance
+    )
+SELECT Z.jmeno, Z.prijmeni, Z.role, O.nazev_oddeleni,  COALESCE(PU.pocet_udalosti, 0) pocet_udalosti
+FROM Zamestnanec Z LEFT JOIN Pocty_udalosti PU ON Z.c_zamestnance = PU.c_zamestnance LEFT JOIN Oddeleni O ON Z.kod_oddeleni_zamestnance = O.kod_oddeleni
+WHERE Z.role in ('MAN', 'RED');
+
+-- Demonstrace materializovaného pohledu Aktivita_duben
+SELECT *
+FROM Aktivita_duben;
+
+-- Pokus o úpravu dat v materializovaném pohledu
+UPDATE  Aktivita_duben SET pocet_udalosti = 10 WHERE jmeno = 'Tereza' AND prijmeni = 'Doubravová'; -- vyhodí výjimku, protože materializovaný view nelze upravovat.
+
 --!! Konec části spouštěné XMAHDA14 !!--
 
 ---- Pohled zobrazující nepřítomnost ředitele firmy (pouze pro čtení)
