@@ -3,6 +3,7 @@ DROP TABLE Udalost CASCADE CONSTRAINTS PURGE;
 DROP TABLE Zamestnanec CASCADE CONSTRAINTS PURGE;
 DROP TABLE Oddeleni CASCADE CONSTRAINTS PURGE;
 
+---------------------- Vytvoření tabulek ------------------------------
 CREATE TABLE Oddeleni
 (
     kod_oddeleni   VARCHAR(10) PRIMARY KEY,
@@ -27,7 +28,7 @@ CREATE TABLE Zamestnanec
         FOREIGN KEY (kod_oddeleni_zamestnance) REFERENCES Oddeleni (kod_oddeleni),
     CONSTRAINT CHK_format_rc
         CHECK ( (REGEXP_LIKE(rodne_c, '^[0-9]{10}$') AND MOD(rodne_c, 11) = 0) OR
-                 REGEXP_LIKE(rodne_c, '^[0-9]{6}[1-9]{3}$')),
+                REGEXP_LIKE(rodne_c, '^[0-9]{6}[1-9]{3}$')),
     CONSTRAINT CHK_role_zamestnance
         CHECK ( (role = 'RED' AND id_nadrizeny_reditel IS NULL AND kod_oddeleni_zamestnance IS NULL) OR
                 (role = 'MAN' AND id_nadrizeny_reditel IS NULL AND kod_oddeleni_zamestnance IS NOT NULL) OR
@@ -35,11 +36,12 @@ CREATE TABLE Zamestnanec
                 (role = 'SEK' AND id_nadrizeny_reditel IS NOT NULL AND kod_oddeleni_zamestnance IS NULL))
 );
 
--- trigger č.1 - auto increment id zaměstnance
+---- Trigger č.1 - auto increment id zaměstnance
 DROP SEQUENCE c_zamestanance_SEQ;
 CREATE SEQUENCE c_zamestanance_SEQ START WITH 1 INCREMENT BY 1;
 CREATE OR REPLACE TRIGGER auto_c_zamestnance
-    BEFORE INSERT ON Zamestnanec
+    BEFORE INSERT
+    ON Zamestnanec
     FOR EACH ROW
 BEGIN
     IF :NEW.c_zamestnance IS NULL THEN
@@ -76,7 +78,8 @@ CREATE TABLE Ucast_udalosti
         FOREIGN KEY (id_udalosti) REFERENCES Udalost (id_udalosti)
 );
 
--- Oddeleni
+----------------------- Naplnění tabulek ukázkovými daty ------------------
+-- Odddělení
 INSERT INTO Oddeleni (kod_oddeleni, nazev_oddeleni)
 VALUES ('FIN', 'Finanční oddělení');
 
@@ -89,7 +92,7 @@ VALUES ('MRK', 'Marketingové oddělení');
 INSERT INTO Oddeleni (kod_oddeleni, nazev_oddeleni)
 VALUES ('NZO', 'Nově zakládané oddělení');
 
--- Uzivatele
+-- Zaměstnanci
 INSERT INTO Zamestnanec (rodne_c, jmeno, prijmeni, role)
 VALUES (7902173675, 'Jan', 'Pajtl', 'RED');
 
@@ -111,7 +114,7 @@ VALUES (6553157160, 'Anna', 'Zoufalá', 'SEK', 'FIN');
 INSERT INTO Zamestnanec (rodne_c, jmeno, prijmeni, role, kod_oddeleni_zamestnance)
 VALUES (7008116137, 'Tomáš', 'Prativa', 'MAN', 'MRK');
 
--- Udalosti
+-- Události
 INSERT INTO Udalost (datum_cas_od, datum_cas_do, nazev, misto_konani, popis, id_autor)
 VALUES (TO_DATE('5.4.2022 10:00', 'DD.MM.YYYY HH24:MI'), TO_DATE('5.4.2022 12:00', 'DD.MM.YYYY HH24:MI'),
         'Schůzka s obchodními partnery', 'Vstupní hala',
@@ -129,7 +132,7 @@ INSERT INTO Udalost (datum_cas_od, datum_cas_do, nazev, misto_konani, id_autor)
 VALUES (TO_DATE('12.4.2022 9:00', 'DD.MM.YYYY HH24:MI'), TO_DATE('28.4.2022 9:30', 'DD.MM.YYYY HH24:MI'),
         'Schůze vedení', 'Konferenční sál', 1);
 
--- Ucastnici udalosti
+-- Účasti na událostech
 INSERT INTO Ucast_udalosti (c_zamestnance, id_udalosti)
 VALUES (3, 1);
 
@@ -151,27 +154,26 @@ VALUES (2, 4);
 INSERT INTO Ucast_udalosti (c_zamestnance, id_udalosti)
 VALUES (3, 4);
 
--- ================= pokročilé objekty schématu databáze ===========================
+----------- Vytvoření pokročilých objektů schématu databáze ---------------------------
+-- SET serveroutput ON; -- odkomentovat v případě používání SQL Developeru
 
--- !! PŘED ODEVZDÁNÍM ODKOMENTOVAT !! - na demu říkal ať to do skriptu dáme, ale v datagripu to nefunguje
--- SET serveroutput ON;
+---- Triggery: - 1. umístěn za příkazem vytvoření tabulky uživatele
+--          - 2. a 3. umístěny na konci souboru (pro jejich demonstraci jsou použity neidempotentní operace)
 
--- triggery: - 1. umístěn za příkazem vytvoření tabulky uživatele
---          - 2. a 3. umístěny na konci souboru (pro jejich testování jsou použity neidempotentní operace)
-
--- procedura č.1
+---- Procedura č.1 ----
 -- Kolik událostí v průměru vytvořil zaměstnanec daného oddělení (včetně samotného manažera)
-CREATE OR REPLACE PROCEDURE pocet_udalosti_na_zamestnance (kod_oddeleni VARCHAR)
+CREATE OR REPLACE PROCEDURE pocet_udalosti_na_zamestnance(kod_oddeleni VARCHAR)
 AS
-    c_manazera              Zamestnanec.c_zamestnance%TYPE;
-    p_udalosti              INT;
-    p_zamestnancu           INT;
-    pocet_na_zamestnance    FLOAT;
+    c_manazera           Zamestnanec.c_zamestnance%TYPE;
+    p_udalosti           INT;
+    p_zamestnancu        INT;
+    pocet_na_zamestnance FLOAT;
 BEGIN
     SELECT c_zamestnance
     INTO c_manazera
     FROM Zamestnanec
-    WHERE role = 'MAN' AND kod_oddeleni_zamestnance = kod_oddeleni;
+    WHERE role = 'MAN'
+      AND kod_oddeleni_zamestnance = kod_oddeleni;
 
     SELECT COUNT(*)
     INTO p_zamestnancu
@@ -187,176 +189,212 @@ BEGIN
     DBMS_OUTPUT.PUT_LINE('Kód oddělení: ' || kod_oddeleni || CHR(10) ||
                          'Počet událostí na zaměstnance: ' || pocet_na_zamestnance);
 
-    EXCEPTION WHEN NO_DATA_FOUND THEN
-    BEGIN
-    DBMS_OUTPUT.put_line('Kód oddělení: ' || kod_oddeleni || CHR(10) ||
-                         'Oddělení nemá manažera, tedy ani žádné události.');
-    END;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        BEGIN
+            DBMS_OUTPUT.put_line('Kód oddělení: ' || kod_oddeleni || CHR(10) ||
+                                 'Oddělení nemá manažera, tedy ani žádné události.');
+        END;
 END;
--- test procedury č.1
+-- Demonstrace procedury č.1
 BEGIN
     pocet_udalosti_na_zamestnance('FIN');
-    pocet_udalosti_na_zamestnance('NZO'); -- vyvolá výjimku
+    pocet_udalosti_na_zamestnance('NZO'); -- vyvolání výjimky
 END;
 
--- procedura č.2
+---- Procedura č.2 ----
 -- Detaily zadané události včetně zůčastněných zaměstanců a jejich počtu
-CREATE OR REPLACE PROCEDURE detaily_udalosti (id_udalosti_p INT) AS
-    detail_udalosti     Udalost%ROWTYPE;
-    ucastnik            Zamestnanec%ROWTYPE;
-    id_ucastnika        Zamestnanec.c_zamestnance%TYPE;
-    pocet_ucastniku     INT := 0;
-    nazev_odd_p         VARCHAR(255);
-    output              VARCHAR(1000);
-
+CREATE OR REPLACE PROCEDURE detaily_udalosti(id_udalosti_p INT) AS
+    detail_udalosti udalost%ROWTYPE;
+    ucastnik        zamestnanec%ROWTYPE;
+    id_ucastnika    Zamestnanec.c_zamestnance%TYPE;
+    pocet_ucastniku INT := 0;
+    nazev_odd_p     VARCHAR(255);
+    output          VARCHAR(1000);
     CURSOR ucastnik_cur (id_udalosti_cur INT) IS
-    SELECT c_zamestnance
-    FROM Ucast_udalosti
-    WHERE id_udalosti = id_udalosti_cur;
+        SELECT c_zamestnance
+        FROM Ucast_udalosti
+        WHERE id_udalosti = id_udalosti_cur;
 BEGIN
     SELECT *
     INTO detail_udalosti
     FROM Udalost
     WHERE Udalost.id_udalosti = id_udalosti_p;
     output := 'Název: ' || detail_udalosti.nazev || CHR(10) ||
-              'Od: ' || TO_CHAR(detail_udalosti.datum_cas_od,'DD.MM.YYYY HH24:MI') || CHR(10) ||
+              'Od: ' || TO_CHAR(detail_udalosti.datum_cas_od, 'DD.MM.YYYY HH24:MI') || CHR(10) ||
               'Do: ' || TO_CHAR(detail_udalosti.datum_cas_do, 'DD.MM.YYYY HH24:MI') || CHR(10) ||
               'Místo konání: ' || detail_udalosti.misto_konani || CHR(10) ||
               'Popis: ' || detail_udalosti.popis || CHR(10);
 
     OPEN ucastnik_cur(id_udalosti_p);
-	LOOP
-		FETCH ucastnik_cur INTO id_ucastnika;
-    	EXIT WHEN ucastnik_cur%NOTFOUND;
+    LOOP
+        FETCH ucastnik_cur INTO id_ucastnika;
+        EXIT WHEN ucastnik_cur%NOTFOUND;
 
-		pocet_ucastniku := pocet_ucastniku + 1;
-		IF pocet_ucastniku = 1 THEN
-            output :=  output || 'Účastní se:' || CHR(10);
-		END IF;
+        pocet_ucastniku := pocet_ucastniku + 1;
+        IF pocet_ucastniku = 1 THEN
+            output := output || 'Účastní se:' || CHR(10);
+        END IF;
 
-		SELECT *
-		INTO ucastnik
-		FROM ZAMESTNANEC
-		WHERE c_zamestnance = id_ucastnika;
+        SELECT *
+        INTO ucastnik
+        FROM ZAMESTNANEC
+        WHERE c_zamestnance = id_ucastnika;
 
-		IF ucastnik.role = 'RED' THEN
-            output := output || '- ' || ucastnik.jmeno ||' '|| ucastnik.prijmeni || ', ředitel' || CHR(10);
-		ELSE
+        IF ucastnik.role = 'RED' THEN
+            output := output || '- ' || ucastnik.jmeno || ' ' || ucastnik.prijmeni || ', ředitel' || CHR(10);
+        ELSE
             SELECT nazev_oddeleni
             INTO nazev_odd_p
             FROM Oddeleni
             WHERE ucastnik.kod_oddeleni_zamestnance = Oddeleni.kod_oddeleni;
 
-            output := output || '- ' || ucastnik.jmeno ||' '|| ucastnik.prijmeni || ', ' || nazev_odd_p || ' - manažer' || CHR(10);
+            output := output || '- ' || ucastnik.jmeno || ' ' || ucastnik.prijmeni || ', ' || nazev_odd_p ||
+                      ' - manažer' || CHR(10);
         END IF;
-	END LOOP;
-	CLOSE ucastnik_cur;
-	output := output || 'Celkem účastníků: ' || pocet_ucastniku;
-	DBMS_OUTPUT.PUT_LINE(output);
+    END LOOP;
+    CLOSE ucastnik_cur;
+    output := output || 'Celkem účastníků: ' || pocet_ucastniku;
+    DBMS_OUTPUT.PUT_LINE(output);
 
-	EXCEPTION WHEN NO_DATA_FOUND THEN
-    BEGIN
-        DBMS_OUTPUT.put_line('CHYBA: Údálost s daným identifikátorem neexistuje.');
-    END;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        BEGIN
+            DBMS_OUTPUT.put_line('CHYBA: Událost s daným identifikátorem neexistuje.');
+        END;
 END;
--- test procedury č.2
+-- Demonstrace procedury č.2
 BEGIN
-    detaily_udalosti(2);
-    detaily_udalosti(6); -- vyvolá výjimku
+    detaily_udalosti(4);
+    detaily_udalosti(6); -- vyvolání výjimky
 END;
 
-
--- EXPLAIN PLAIN + index (optimalizace)
+----  EXPLAIN PLAIN + index ----
 -- Kolika událostí se v dubnu 2022 účastní jednotliví členové vedení?
 EXPLAIN PLAN FOR
 SELECT O.nazev_oddeleni, COUNT(Z.c_zamestnance) AS pocet_zamestanancu
-FROM Oddeleni O LEFT JOIN Zamestnanec Z ON Z.kod_oddeleni_zamestnance = O.kod_oddeleni
+FROM Oddeleni O
+         LEFT JOIN Zamestnanec Z ON Z.kod_oddeleni_zamestnance = O.kod_oddeleni
 GROUP BY O.kod_oddeleni, O.nazev_oddeleni;
 
-SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+SELECT *
+FROM TABLE (DBMS_XPLAN.DISPLAY);
 
--- Pridani indexu pro optimalizaci
-CREATE INDEX oddeleni_nazev ON Oddeleni(nazev_oddeleni);
+-- Přidání indexu pro optimalizaci
+CREATE INDEX oddeleni_k_n ON Oddeleni(kod_oddeleni, nazev_oddeleni);
 
--- Opakovani EXPLAIN PLAIN
+-- Zopakování EXPLAIN PLAIN
 EXPLAIN PLAN FOR
 SELECT O.nazev_oddeleni, COUNT(Z.c_zamestnance) AS pocet_zamestanancu
-FROM Oddeleni O LEFT JOIN Zamestnanec Z ON Z.kod_oddeleni_zamestnance = O.kod_oddeleni
+FROM Oddeleni O
+         LEFT JOIN Zamestnanec Z ON Z.kod_oddeleni_zamestnance = O.kod_oddeleni
 GROUP BY O.kod_oddeleni, O.nazev_oddeleni;
 
-SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+SELECT *
+FROM TABLE (DBMS_XPLAN.DISPLAY);
 
--- definice přístupových práv
-GRANT ALL ON Oddeleni       TO XMAHDA14;
+---- Definice přístupových práv pro druhého člena týmu ----
+GRANT ALL ON Oddeleni TO XMAHDA14;
 GRANT ALL ON Ucast_udalosti TO XMAHDA14;
-GRANT ALL ON Zamestnanec    TO XMAHDA14;
-GRANT ALL ON Udalost        TO XMAHDA14;
+GRANT ALL ON Zamestnanec TO XMAHDA14;
+GRANT ALL ON Udalost TO XMAHDA14;
 
-GRANT EXECUTE ON pocet_udalosti_na_zamestnance  TO XMAHDA14;
-GRANT EXECUTE ON detaily_udalosti               TO XMAHDA14;
+GRANT EXECUTE ON pocet_udalosti_na_zamestnance TO XMAHDA14;
+GRANT EXECUTE ON detaily_udalosti TO XMAHDA14;
 
--- materializovaný pohled zobrazující události manažera finančního oddělení
+---- Materializovaný pohled vytvořený druhým členem týmu ----
+--!! Následující část spouští XMAHDA14 !!--
+-- Zobrazuje události manažera finančního oddělení
 DROP MATERIALIZED VIEW Udalosti_manazera_FIN;
 CREATE MATERIALIZED VIEW Udalosti_manazera_FIN AS
-    SELECT * FROM Udalost U
-    WHERE U.id_autor IN ( SELECT Z.c_zamestnance
-                          FROM Zamestnanec Z
-                          WHERE Z.kod_oddeleni_zamestnance = 'FIN');
--- Test Udalosti_manazera_FIN
-SELECT * FROM Udalosti_manazera_FIN;
+SELECT *
+FROM XGOTTW07.Udalost U
+WHERE U.id_autor IN (SELECT Z.c_zamestnance
+                     FROM XGOTTW07.Zamestnanec Z
+                     WHERE Z.kod_oddeleni_zamestnance = 'FIN');
+-- Demonstrace materializovaného pohledu Udalosti_manazera_FIN
+SELECT *
+FROM Udalosti_manazera_FIN;
 
--- Přidání nové položky do Udalost
-INSERT INTO Udalost (datum_cas_od, datum_cas_do, nazev, misto_konani, id_autor)
-    VALUES (TO_DATE('29.4.2022 15:00', 'DD.MM.YYYY HH24:MI'), TO_DATE('29.4.2022 22:00', 'DD.MM.YYYY HH24:MI'),
+-- Přidání nové položky do tabulky Udalost
+INSERT INTO XGOTTW07.Udalost (datum_cas_od, datum_cas_do, nazev, misto_konani, id_autor)
+VALUES (TO_DATE('29.4.2022 15:00', 'DD.MM.YYYY HH24:MI'), TO_DATE('29.4.2022 22:00', 'DD.MM.YYYY HH24:MI'),
         'Teambuilding', 'Externi prostory', 4);
 
--- Upráva položky v Udalost
-UPDATE Udalost SET datum_cas_od = TO_DATE('29.4.2022 15:00', 'DD.MM.YYYY HH24:MI'), datum_cas_do = TO_DATE('29.4.2022 22:00', 'DD.MM.YYYY HH24:MI') WHERE id_udalosti = 3;
+-- Upráva položky v tabluce Udalost
+UPDATE XGOTTW07.Udalost
+SET datum_cas_od = TO_DATE('29.4.2022 15:00', 'DD.MM.YYYY HH24:MI'),
+    datum_cas_do = TO_DATE('29.4.2022 22:00', 'DD.MM.YYYY HH24:MI')
+WHERE id_udalosti = 3;
 
--- Opětovný výpis položek (provedené změny se v material view neprojevi)
-SELECT * FROM Udalosti_manazera_FIN;
--- vs
-SELECT * FROM Udalost U
-    WHERE U.id_autor IN ( SELECT Z.c_zamestnance
-                          FROM Zamestnanec Z
-                          WHERE Z.kod_oddeleni_zamestnance = 'FIN');
+-- Opětovný výpis položek (provedené změny se v materializovaném pohledu neprojeví)
+SELECT *
+FROM Udalosti_manazera_FIN;
+-- Výpis položek z databáze - změny provedeny byly
+SELECT *
+FROM XGOTTW07.Udalost U
+WHERE U.id_autor IN (SELECT Z.c_zamestnance
+                     FROM XGOTTW07.Zamestnanec Z
+                     WHERE Z.kod_oddeleni_zamestnance = 'FIN');
+--!! Konec části spouštěné XMAHDA14 !!--
 
--- Pohled zobrazující nepřítomnost ředitele firmy (READ ONLY)
-DROP VIEW Reditelova_nepritomnost;
-CREATE OR REPLACE VIEW Reditelova_nepritomnost AS
-    SELECT U.datum_cas_od, U.datum_cas_do
-    FROM Udalost U
-    WHERE U.id_autor IN ( SELECT Z.c_zamestnance
-                          FROM Zamestnanec Z
-                          WHERE Z.role = 'RED' OR Z.id_nadrizeny_reditel = 1)
-    WITH READ ONLY;
--- Test Reditelova_nepritomnost
-SELECT * FROM Reditelova_nepritomnost;
+---- Pohled zobrazující nepřítomnost ředitele firmy (pouze pro čtení)
+CREATE OR REPLACE VIEW Nepritomnost_reditele AS
+SELECT U.datum_cas_od, U.datum_cas_do
+FROM Udalost U
+WHERE U.id_autor IN (SELECT Z.c_zamestnance
+                     FROM Zamestnanec Z
+                     WHERE Z.role = 'RED'
+                        OR Z.id_nadrizeny_reditel = 1)
+WITH READ ONLY;
+-- Demonstrace pohledu Nepritomnost_reditele
+SELECT *
+FROM Reditelova_nepritomnost;
 
--- trigger č.2
--- on delete cascade - při smazíní uživatele se smažou i jeho účasti na událostech
+---- Trigger č.2 ----
+-- On delete cascade - při smazání uživatele se smažou i jeho účasti na událostech
 CREATE OR REPLACE TRIGGER udalosti_zamestnance_cascade_delete
-BEFORE DELETE ON Zamestnanec
-FOR EACH ROW
+    BEFORE DELETE
+    ON Zamestnanec
+    FOR EACH ROW
 BEGIN
-    DELETE FROM Ucast_udalosti
+    DELETE
+    FROM Ucast_udalosti
     WHERE :OLD.c_zamestnance = Ucast_udalosti.c_zamestnance;
 END;
--- test funkčnosti triggeru č.2
-SELECT * FROM Ucast_udalosti WHERE c_zamestnance = 2;
-DELETE FROM Zamestnanec where c_zamestnance = 2;
-SELECT * FROM Ucast_udalosti WHERE c_zamestnance = 2;
+-- Demonstrace triggeru č.2
+SELECT *
+FROM Ucast_udalosti
+WHERE c_zamestnance = 2;
 
--- trigger č.3
--- on update cascade - při změně kódu oddělení se změní i kód oddělení zaměstnanců
+DELETE
+FROM Zamestnanec
+WHERE c_zamestnance = 2;
+
+SELECT *
+FROM Ucast_udalosti
+WHERE c_zamestnance = 2;
+
+---- Trigger č.3 ----
+-- On update cascade - při změně kódu oddělení se změní i kód oddělení u zaměstnanců
 CREATE OR REPLACE TRIGGER kod_oddeleni_cascade_update
-AFTER UPDATE OF kod_oddeleni ON Oddeleni
-FOR EACH ROW
+    AFTER UPDATE OF kod_oddeleni
+    ON Oddeleni
+    FOR EACH ROW
 BEGIN
-    UPDATE Zamestnanec SET kod_oddeleni_zamestnance = :NEW.kod_oddeleni
+    UPDATE Zamestnanec
+    SET kod_oddeleni_zamestnance = :NEW.kod_oddeleni
     WHERE kod_oddeleni_zamestnance = :OLD.kod_oddeleni;
 END;
--- test funkčnosti triggeru č.3
-SELECT * FROM Zamestnanec WHERE kod_oddeleni_zamestnance = 'HR';
-UPDATE Oddeleni SET kod_oddeleni='LZ' WHERE kod_oddeleni = 'HR';
-SELECT * FROM Zamestnanec WHERE kod_oddeleni_zamestnance = 'LZ';
+-- Demonstrace triggeru č.3
+SELECT *
+FROM Zamestnanec
+WHERE kod_oddeleni_zamestnance = 'HR';
+
+UPDATE Oddeleni
+SET kod_oddeleni='LZ'
+WHERE kod_oddeleni = 'HR';
+
+SELECT *
+FROM Zamestnanec
+WHERE kod_oddeleni_zamestnance = 'LZ';
