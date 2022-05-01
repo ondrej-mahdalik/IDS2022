@@ -267,7 +267,24 @@ END;
 
 
 -- EXPLAIN PLAIN + index (optimalizace)
---TODO
+-- Kolika událostí se v dubnu 2022 účastní jednotliví členové vedení?
+EXPLAIN PLAN FOR
+SELECT O.nazev_oddeleni, COUNT(Z.c_zamestnance) AS pocet_zamestanancu
+FROM Oddeleni O LEFT JOIN Zamestnanec Z ON Z.kod_oddeleni_zamestnance = O.kod_oddeleni
+GROUP BY O.kod_oddeleni, O.nazev_oddeleni;
+
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+
+-- Pridani indexu pro optimalizaci
+CREATE INDEX oddeleni_nazev ON Oddeleni(nazev_oddeleni);
+
+-- Opakovani EXPLAIN PLAIN
+EXPLAIN PLAN FOR
+SELECT O.nazev_oddeleni, COUNT(Z.c_zamestnance) AS pocet_zamestanancu
+FROM Oddeleni O LEFT JOIN Zamestnanec Z ON Z.kod_oddeleni_zamestnance = O.kod_oddeleni
+GROUP BY O.kod_oddeleni, O.nazev_oddeleni;
+
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
 
 -- definice přístupových práv
 GRANT ALL ON Oddeleni       TO XMAHDA14;
